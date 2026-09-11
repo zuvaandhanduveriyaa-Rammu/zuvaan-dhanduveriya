@@ -87,16 +87,12 @@ function toSql(run: Run): Sql {
 
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
-    // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
-    // pooled endpoint. One pool per process; warm serverless instances reuse it.
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    // Neon serverless HTTP driver. `pg` TCP cannot run on Cloudflare Workers.
+    const { neon } = await import("@neondatabase/serverless");
+    const client = neon(databaseUrl as string);
     return toSql(async <T>(text: string, params: unknown[]) => {
-      const res = await pool.query(text, params);
-      return res.rows as T[];
+      const rows = await client.query(text, params);
+      return rows as T[];
     });
   })().catch((err) => {
     globalRef.__pgSqlPromise__ = undefined;

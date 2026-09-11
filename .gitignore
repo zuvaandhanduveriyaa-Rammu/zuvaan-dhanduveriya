@@ -5,6 +5,8 @@ node_modules/
 .env.*
 .vercel/
 .grok/
+.wrangler/
+.dev.vars
 artifacts/
 screenshots/
 attachments/

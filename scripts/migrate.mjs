@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Deploy-time database migrator (node-postgres, `pg`).
+ * One-time / CI database migrator (node-postgres, `pg`).
  *
- * Runs during `npm run build` — on every Vercel deploy — applying pending files
- * in ../migrations to DATABASE_URL. Each file is applied in one transaction and
- * recorded in a `_migrations` table, so it runs once and is safe to re-run.
+ * Apply pending files in ../migrations to DATABASE_URL. Cloudflare Workers
+ * cannot run this (no TCP, no filesystem). Run it from a laptop or CI:
  *
- * The read is non-recursive, so the opt-in auth schema under migrations/auth/
- * is not applied to an app that never asked for sign-in.
+ *   DATABASE_URL='postgres://...' npm run db:migrate
  *
- * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
- * the same files at startup instead (see src/lib/db.ts).
+ * Each file is applied in one transaction and recorded in `_migrations`.
+ *
+ * No DATABASE_URL -> skip; the PGLite fallback applies the same files at
+ * local `npm run dev` startup instead (see src/lib/db.ts).
  */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

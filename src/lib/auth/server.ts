@@ -24,7 +24,7 @@
  *     `requireUserId` resolves a dev user with no database configured, and
  *     throws fail-closed once `DATABASE_URL` is set (see `verify.server.ts`).
  *
- * NEVER import this from client code — it pulls in `pg` + the preview secret +
+ * NEVER import this from client code — it pulls in Neon + the preview secret +
  * server-only Better Auth internals. The client uses `@/lib/auth/client`;
  * components read the user via `@/lib/auth/use-current-user`; server functions get
  * a verified id via `@/lib/auth/middleware`.
@@ -34,7 +34,7 @@ import { bearer, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
-import { Pool } from "pg";
+import { neonConfig, Pool } from "@neondatabase/serverless";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
@@ -116,7 +116,12 @@ const baseURL = explicitBaseURL ?? {
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
 const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
+  ? [
+      explicitBaseURL,
+      explicitBaseURL.replace("://www.", "://"),
+      explicitBaseURL.replace("://", "://www."),
+      ...LOCAL_DEV_ORIGINS,
+    ].filter((origin, i, all) => all.indexOf(origin) === i)
   : [
       // Host wildcards (matched against Origin's host)
       ...previewAllowedHosts,
@@ -127,10 +132,9 @@ const trustedOrigins: string[] = explicitBaseURL
 
 const databaseUrl = env("DATABASE_URL");
 
-// Static broker OAuth endpoints (skip OIDC discovery on every sign-in / callback).
-// Discovery would cost an extra network hop to the broker before the popup can
-// even redirect to Google/X — the live-preview popup felt stuck on the app for
-// that whole round-trip. These paths match the broker's discovery document.
+// Workers cannot open a Postgres TCP socket. HTTP fetch for Pool.query.
+neonConfig.poolQueryViaFetch = true;
+
 const issuerBase = grokIssuer.replace(/\/+$/, "");
 const grokAuthorizationUrl = `${issuerBase}/api/auth/oauth2/authorize`;
 const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
