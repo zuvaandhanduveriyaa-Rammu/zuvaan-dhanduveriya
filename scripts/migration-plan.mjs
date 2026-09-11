@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
- * (deploy, `readdir`) and `src/lib/db.ts` (PGLite preview, `import.meta.glob`).
+ * (local SQLite file, `readdir`) and `src/lib/db.ts` (local `npm run dev`,
+ * `import.meta.glob`). Production D1 is applied with Wrangler.
  *
  * Applied files are keyed by BASENAME, so the same file applies once no matter
  * which directory it is globbed from. That is what makes the auth schema safe to

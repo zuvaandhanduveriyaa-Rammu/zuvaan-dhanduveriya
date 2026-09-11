@@ -3,6 +3,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql, type Sql } from "@/lib/db";
 import { num } from "@/lib/money";
 import {
+  bool,
   mapOrder,
   mapPartner,
   mapProduct,
@@ -23,7 +24,7 @@ class ForbiddenError extends Error {
 
 async function emailForUser(sql: Sql, userId: string) {
   const rows = await sql.query<{ email: string }>(
-    `select email from "user" where id = $1`,
+    `select email from "user" where id = ?`,
     [userId],
   );
   return rows[0]?.email ? rows[0].email.trim().toLowerCase() : "";
@@ -37,12 +38,10 @@ async function requireAdmin(sql: Sql, userId: string) {
   }
   if (email !== DEPUTY_EMAIL) throw new ForbiddenError();
   try {
-    const row = await sql<{ active: boolean | string }>`
+    const row = await sql<{ active: boolean | string | number }>`
       select active from staff where email = ${email}
     `;
-    const active = row[0]?.active;
-    const live = active === true || active === "t" || active === "true";
-    if (!row[0] || !live) throw new ForbiddenError();
+    if (!row[0] || !bool(row[0].active)) throw new ForbiddenError();
   } catch (err) {
     if (err instanceof ForbiddenError) throw err;
     throw new ForbiddenError();
@@ -111,11 +110,11 @@ export const getAdminStats = createServerFn({ method: "GET" })
       throw err;
     }
     const [orders, value, products, voices, visits] = await Promise.all([
-      sql<{ n: number }>`select count(*)::int as n from orders where status in ('new','confirmed','packed')`,
+      sql<{ n: number }>`select count(*) as n from orders where status in ('new','confirmed','packed')`,
       sql<{ v: unknown }>`select coalesce(sum(total_mvr), 0) as v from orders where status <> 'cancelled'`,
-      sql<{ n: number }>`select count(*)::int as n from products where active = true`,
-      sql<{ n: number }>`select count(*)::int as n from testimonials where status = 'pending'`,
-      sql<{ n: number }>`select count(*)::int as n from visits where status = 'new'`,
+      sql<{ n: number }>`select count(*) as n from products where active = 1`,
+      sql<{ n: number }>`select count(*) as n from testimonials where status = 'pending'`,
+      sql<{ n: number }>`select count(*) as n from visits where status = 'new'`,
     ]);
     return {
       isAdmin: true,
@@ -332,8 +331,8 @@ export const saveSiteImage = createServerFn({ method: "POST" })
     await requireAdmin(sql, context.userId);
     await sql`
       insert into site_images (slot, url, updated_at)
-      values (${data.slot}, ${data.url}, now())
-      on conflict (slot) do update set url = excluded.url, updated_at = now()
+      values (${data.slot}, ${data.url}, datetime('now'))
+      on conflict (slot) do update set url = excluded.url, updated_at = datetime('now')
     `;
     return { ok: true as const };
   });
@@ -348,21 +347,21 @@ export const listAdminOrders = createServerFn({ method: "GET" })
         o.id, o.customer_name, o.phone, o.island, o.notes, o.status,
         o.total_mvr, o.created_at,
         coalesce(
-          json_agg(
-            json_build_object(
+          (
+            select json_group_array(json_object(
               'id', i.id,
               'product_id', i.product_id,
               'name', i.name,
               'unit', i.unit,
               'qty', i.qty,
               'unit_price_mvr', i.unit_price_mvr
-            ) order by i.id
-          ) filter (where i.id is not null),
-          '[]'::json
+            ))
+            from order_items i
+            where i.order_id = o.id
+          ),
+          '[]'
         ) as items
       from orders o
-      left join order_items i on i.order_id = o.id
-      group by o.id
       order by o.created_at desc
       limit 80
     `;
@@ -564,7 +563,7 @@ export const listStaff = createServerFn({ method: "GET" })
     const sql = await getSql();
     const me = await requireAdmin(sql, context.userId);
     if (!me.isOwner) throw new ForbiddenError();
-    const rows = await sql<{ email: string; role: string; active: boolean | string }>`
+    const rows = await sql<{ email: string; role: string; active: boolean | string | number }>`
       select email, role, active from staff
     `;
     const byEmail = new Map(
@@ -573,7 +572,7 @@ export const listStaff = createServerFn({ method: "GET" })
         {
           email: row.email.trim().toLowerCase(),
           role: row.role === "owner" ? ("owner" as const) : ("admin" as const),
-          active: row.active === true || row.active === "t" || row.active === "true",
+          active: bool(row.active),
         },
       ]),
     );
@@ -612,4 +611,3 @@ export const setStaffActive = createServerFn({ method: "POST" })
     `;
     return { ok: true as const };
   });
-

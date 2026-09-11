@@ -9,5 +9,14 @@
   },
   "vars": {
     "BETTER_AUTH_URL": "https://zuvaandhanduveriya.com"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zuvaan",
+      // Paste the database_id printed by `npx wrangler d1 create zuvaan`
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

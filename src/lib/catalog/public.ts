@@ -18,7 +18,7 @@ export const getCatalog = createServerFn({ method: "GET" }).handler(
           select id, slug, name, kind, season, note, image, unit, price_mvr,
                  in_stock, featured, sort_order, active
           from products
-          where active = true
+          where active = 1
           order by sort_order asc, id asc
         `,
         sql<VoiceRow>`
@@ -70,7 +70,7 @@ export const getStaffStatus = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
       const sql = await getSql();
-      const rows = await sql<{ n: number }>`select count(*)::int as n from admins`;
+      const rows = await sql<{ n: number }>`select count(*) as n from admins`;
       return { hasAdmin: Number(rows[0]?.n ?? 0) > 0 };
     } catch {
       return { hasAdmin: false };

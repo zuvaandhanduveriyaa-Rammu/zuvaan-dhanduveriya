@@ -1,32 +1,29 @@
 #!/usr/bin/env node
 /**
- * One-time / CI database migrator (node-postgres, `pg`).
+ * Apply pending files in ../migrations to the local SQLite file used by
+ * `npm run dev` (`.data/zuvaan.sqlite`). Production D1 is migrated with Wrangler:
  *
- * Apply pending files in ../migrations to DATABASE_URL. Cloudflare Workers
- * cannot run this (no TCP, no filesystem). Run it from a laptop or CI:
+ *   npx wrangler d1 migrations apply zuvaan --remote
  *
- *   DATABASE_URL='postgres://...' npm run db:migrate
+ * or, file by file:
  *
- * Each file is applied in one transaction and recorded in `_migrations`.
+ *   npx wrangler d1 execute zuvaan --remote --file=migrations/0001_auth.sql
+ *   npx wrangler d1 execute zuvaan --remote --file=migrations/0002_farm_cms.sql
+ *   npx wrangler d1 execute zuvaan --remote --file=migrations/0003_socials_partners.sql
+ *   npx wrangler d1 execute zuvaan --remote --file=migrations/0004_plain_dashes.sql
+ *   npx wrangler d1 execute zuvaan --remote --file=migrations/0005_staff_emails.sql
  *
- * No DATABASE_URL -> skip; the PGLite fallback applies the same files at
- * local `npm run dev` startup instead (see src/lib/db.ts).
+ * Cloudflare builds do not run this script.
  */
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import pg from "pg";
+import { DatabaseSync } from "node:sqlite";
 import { pendingMigrations } from "./migration-plan.mjs";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.log(
-    "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
-  );
-  process.exit(0);
-}
-
-const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const migrationsDir = join(root, "migrations");
+const dbPath = join(root, ".data", "zuvaan.sqlite");
 
 async function main() {
   let entries;
@@ -36,55 +33,54 @@ async function main() {
     console.log("[migrate] no migrations/ directory — nothing to do.");
     return;
   }
-  // An app with no schema of its own must not pay for a database connection.
   if (pendingMigrations(entries, []).length === 0) {
     console.log("[migrate] no migrations — nothing to do.");
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  const client = await pool.connect();
-  try {
-    await client.query(
-      "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
-    );
-    const applied = (await client.query("SELECT name FROM _migrations")).rows.map(
-      (r) => r.name,
-    );
+  await mkdir(join(root, ".data"), { recursive: true });
+  const db = new DatabaseSync(dbPath);
+  db.exec("PRAGMA foreign_keys = ON;");
+  db.exec(
+    "create table if not exists _migrations (name text primary key, applied_at text not null default (datetime('now')))",
+  );
+  const applied = db
+    .prepare("select name from _migrations")
+    .all()
+    .map((r) => r.name);
 
-    let count = 0;
-    for (const { name } of pendingMigrations(entries, applied)) {
-      const text = await readFile(join(migrationsDir, name), "utf8");
+  let count = 0;
+  for (const { name } of pendingMigrations(entries, applied)) {
+    const text = await readFile(join(migrationsDir, name), "utf8");
+    try {
+      db.exec("BEGIN");
+      db.exec(text);
+      db.prepare("insert into _migrations (name) values (?)").run(name);
+      db.exec("COMMIT");
+    } catch (err) {
+      console.error(`[migrate] error applying ${name}`);
       try {
-        await client.query("BEGIN");
-        // pg's simple-query protocol runs a whole multi-statement file at once.
-        await client.query(text);
-        await client.query("INSERT INTO _migrations (name) VALUES ($1)", [name]);
-        await client.query("COMMIT");
-      } catch (err) {
-        console.error(`[migrate] error applying ${name}`);
-        try {
-          await client.query("ROLLBACK");
-        } catch {
-          // ROLLBACK fails when the connection died — keep the original error.
-        }
-        throw err;
+        db.exec("ROLLBACK");
+      } catch {
+        // keep the original error
       }
-      console.log(`[migrate] applied ${name}`);
-      count += 1;
+      throw err;
     }
-    console.log(count ? `[migrate] done — ${count} migration(s) applied.` : "[migrate] up to date.");
-  } finally {
-    client.release();
-    await pool.end();
+    console.log(`[migrate] applied ${name}`);
+    count += 1;
   }
+  db.close();
+  console.log(
+    count
+      ? `[migrate] done — ${count} migration(s) applied to ${dbPath}`
+      : `[migrate] up to date (${dbPath}).`,
+  );
+  console.log(
+    "[migrate] production D1: npx wrangler d1 migrations apply zuvaan --remote",
+  );
 }
 
 main().catch((err) => {
   console.error("[migrate] failed:", err?.message || err);
-  // pg errors carry the context needed to debug a bad SQL file.
-  for (const key of ["code", "detail", "hint", "position", "where"]) {
-    if (err?.[key] != null) console.error(`[migrate]   ${key}: ${err[key]}`);
-  }
   process.exit(1);
 });

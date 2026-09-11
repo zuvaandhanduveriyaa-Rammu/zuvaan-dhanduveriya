@@ -9,8 +9,14 @@ import type {
   VisitRequest,
 } from "./types";
 
-function bool(value: unknown) {
-  return value === true || value === "t" || value === "true";
+export function bool(value: unknown) {
+  return (
+    value === true ||
+    value === 1 ||
+    value === "1" ||
+    value === "t" ||
+    value === "true"
+  );
 }
 
 export function mapProduct(row: Record<string, unknown>): Product {

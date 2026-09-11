@@ -7,6 +7,10 @@ node_modules/
 .grok/
 .wrangler/
 .dev.vars
+.data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 artifacts/
 screenshots/
 attachments/
