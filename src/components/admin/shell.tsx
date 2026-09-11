@@ -4,11 +4,13 @@ import {
   LayoutDashboard,
   MessageSquare,
   Share2,
+  Shield,
   ShoppingBag,
   Sprout,
   Sun,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { AdminAccess } from "@/components/admin/access";
 import { AdminImages } from "@/components/admin/images";
 import { AdminOrders } from "@/components/admin/orders";
 import { AdminOverview } from "@/components/admin/overview";
@@ -29,9 +31,10 @@ export type AdminTab =
   | "images"
   | "visits"
   | "socials"
-  | "partners";
+  | "partners"
+  | "access";
 
-const TABS: { id: AdminTab; label: string; icon: typeof Sprout }[] = [
+const TABS: { id: AdminTab; label: string; icon: typeof Sprout; owner?: boolean }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "products", label: "Produce", icon: Sprout },
   { id: "orders", label: "Orders", icon: ShoppingBag },
@@ -40,11 +43,13 @@ const TABS: { id: AdminTab; label: string; icon: typeof Sprout }[] = [
   { id: "socials", label: "Socials", icon: Share2 },
   { id: "partners", label: "Partners", icon: BadgeCheck },
   { id: "visits", label: "Visits", icon: Sun },
+  { id: "access", label: "Access", icon: Shield, owner: true },
 ];
 
-export function AdminShell() {
+export function AdminShell({ isOwner }: { isOwner: boolean }) {
   const [tab, setTab] = useState<AdminTab>("overview");
-  const current = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const tabs = TABS.filter((item) => !item.owner || isOwner);
+  const current = tabs.find((t) => t.id === tab) ?? tabs[0];
 
   return (
     <div className="min-h-dvh bg-bg text-fg lg:grid lg:grid-cols-[16rem_1fr]">
@@ -56,7 +61,7 @@ export function AdminShell() {
           Superadmin
         </p>
         <nav className="mt-3 flex flex-col gap-1">
-          {TABS.map((item) => (
+          {tabs.map((item) => (
             <NavBtn
               key={item.id}
               active={tab === item.id}
@@ -86,7 +91,7 @@ export function AdminShell() {
         </header>
         <div className="lg:hidden overflow-x-auto px-4 pb-2">
           <div className="flex w-max gap-1">
-            {TABS.map((item) => (
+            {tabs.map((item) => (
               <NavBtn
                 key={item.id}
                 active={tab === item.id}
@@ -107,6 +112,7 @@ export function AdminShell() {
           {tab === "socials" ? <AdminSocials /> : null}
           {tab === "partners" ? <AdminPartners /> : null}
           {tab === "visits" ? <AdminVisits /> : null}
+          {tab === "access" && isOwner ? <AdminAccess /> : null}
         </div>
       </div>
     </div>

@@ -14,6 +14,9 @@ import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
 const pgliteStub = fileURLToPath(new URL("./src/lib/pglite-stub.ts", import.meta.url));
+const cfWorkersStub = fileURLToPath(
+  new URL("./src/lib/cloudflare-workers-stub.ts", import.meta.url),
+);
 
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
@@ -165,7 +168,7 @@ export default defineConfig(({ command, isPreview }) => {
       tsconfigPaths: true,
       alias: workerBuild
         ? { "@electric-sql/pglite": pgliteStub }
-        : undefined,
+        : { "cloudflare:workers": cfWorkersStub },
     },
     plugins: [
       pgliteBootstrapPlugin(),

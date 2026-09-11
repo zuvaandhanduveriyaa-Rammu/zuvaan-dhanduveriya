@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { SiteImage } from "@/components/site-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import {
   signIn,
 } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { getStaffStatus } from "@/lib/catalog/public";
 
 export const Route = createFileRoute("/login")({ component: LoginPage });
 
@@ -30,18 +29,8 @@ function LoginPage() {
 
 function LoginForm() {
   const [mode, setMode] = useState<"in" | "up">("in");
-  const [hasAdmin, setHasAdmin] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    void getStaffStatus()
-      .then((s) => {
-        setHasAdmin(s.hasAdmin);
-        if (!s.hasAdmin) setMode("up");
-      })
-      .catch(() => undefined);
-  }, []);
 
   async function onEmail(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,7 +39,7 @@ function LoginForm() {
     const data = new FormData(e.currentTarget);
     const email = String(data.get("email") ?? "").trim();
     const password = String(data.get("password") ?? "");
-    const name = String(data.get("name") ?? "").trim() || "Superadmin";
+    const name = String(data.get("name") ?? "").trim() || "Staff";
     try {
       if (mode === "up") {
         const { error: err } = await authClient.signUp.email({
@@ -96,8 +85,7 @@ function LoginForm() {
             <em className="font-serif font-normal italic">for the farm</em>
           </h1>
           <p className="mt-3 text-sm text-muted">
-            Change images, prices, socials, licence entities, and the voices
-            people leave. The public site never sees this desk.
+            Sign in with a farm Gmail. Any other account will see no access.
           </p>
 
           {authEnabled ? (
@@ -127,7 +115,7 @@ function LoginForm() {
             {mode === "up" ? (
               <label className="grid gap-2 text-xs text-muted">
                 Name
-                <Input name="name" placeholder="Ramsey" autoComplete="name" />
+                <Input name="name" placeholder="Name" autoComplete="name" />
               </label>
             ) : null}
             <label className="grid gap-2 text-xs text-muted">
@@ -136,7 +124,7 @@ function LoginForm() {
                 name="email"
                 type="email"
                 required
-                placeholder="you@zuvaan.mv"
+                placeholder="farm Gmail"
                 autoComplete="email"
               />
             </label>
@@ -153,28 +141,17 @@ function LoginForm() {
             </label>
             {error ? <p className="text-sm text-sand">{error}</p> : null}
             <Button type="submit" size="lg" disabled={busy}>
-              {busy
-                ? "Opening…"
-                : mode === "up"
-                  ? "Create the Superadmin desk"
-                  : "Open the desk"}
+              {busy ? "Opening…" : mode === "up" ? "Create staff login" : "Open the desk"}
             </Button>
           </form>
 
-          {!hasAdmin ? (
-            <p className="mt-4 text-xs text-muted">
-              First account becomes Superadmin. After that, only this desk can
-              change the farm.
-            </p>
-          ) : (
-            <button
-              type="button"
-              className="mt-4 text-xs text-muted hover:text-fg"
-              onClick={() => setMode((m) => (m === "in" ? "up" : "in"))}
-            >
-              {mode === "in" ? "Need a staff account?" : "Already have a desk?"}
-            </button>
-          )}
+          <button
+            type="button"
+            className="mt-4 text-xs text-muted hover:text-fg"
+            onClick={() => setMode((m) => (m === "in" ? "up" : "in"))}
+          >
+            {mode === "in" ? "Need a staff login?" : "Already have a desk?"}
+          </button>
         </div>
       </div>
     </main>

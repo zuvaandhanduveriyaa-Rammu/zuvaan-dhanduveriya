@@ -37,15 +37,15 @@ function AdminPage() {
     return (
       <main className="grid min-h-dvh place-items-center bg-bg px-6 text-fg">
         <div className="max-w-md text-center">
-          <p className="kicker">Staff only</p>
+          <p className="kicker">No access</p>
           <h1 className="mt-4 font-sans text-3xl font-medium tracking-tight">
-            This desk is for the
+            This desk is closed
             <br />
-            <em className="font-serif font-normal italic">farm Superadmin</em>
+            <em className="font-serif font-normal italic">to this account</em>
           </h1>
           <p className="mt-4 text-sm text-muted">
-            You are signed in, but this account does not run the house. The
-            first person to open the desk becomes Superadmin.
+            Superadmin is only for the farm owner. You are signed in, but you
+            do not have access.
           </p>
           <Link
             to="/"
@@ -58,5 +58,5 @@ function AdminPage() {
     );
   }
 
-  return <AdminShell />;
+  return <AdminShell isOwner={gate.data?.isOwner === true} />;
 }

@@ -1,5 +1,9 @@
+import { env as workerEnv } from "cloudflare:workers";
+
 export function env(key: string): string | undefined {
-  const v = process.env[key]?.trim();
+  const fromWorker = workerEnv?.[key];
+  if (typeof fromWorker === "string" && fromWorker.trim()) return fromWorker.trim();
+  const v = typeof process !== "undefined" ? process.env[key]?.trim() : undefined;
   return v || undefined;
 }
 

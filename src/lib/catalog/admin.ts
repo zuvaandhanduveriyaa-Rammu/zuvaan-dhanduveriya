@@ -12,6 +12,7 @@ import {
 } from "./map";
 import { SLOT_FALLBACK } from "./slots";
 import { SOCIAL_PLATFORMS, type AdminStats, type FarmOrder, type Partner, type Product, type SocialLink, type Testimonial, type VisitRequest } from "./types";
+import { DEPUTY_EMAIL, OWNER_EMAIL, type StaffMember } from "./staff";
 
 class ForbiddenError extends Error {
   status = 403;
@@ -20,16 +21,33 @@ class ForbiddenError extends Error {
   }
 }
 
+async function emailForUser(sql: Sql, userId: string) {
+  const rows = await sql.query<{ email: string }>(
+    `select email from "user" where id = $1`,
+    [userId],
+  );
+  return rows[0]?.email ? rows[0].email.trim().toLowerCase() : "";
+}
+
 async function requireAdmin(sql: Sql, userId: string) {
-  const existing = await sql<{ user_id: string }>`select user_id from admins limit 1`;
-  if (existing.length === 0) {
-    await sql`insert into admins (user_id) values (${userId})`;
-    return;
+  const email = await emailForUser(sql, userId);
+  if (!email) throw new ForbiddenError();
+  if (email === OWNER_EMAIL) {
+    return { email, isOwner: true as const };
   }
-  const me = await sql<{ user_id: string }>`
-    select user_id from admins where user_id = ${userId}
-  `;
-  if (me.length === 0) throw new ForbiddenError();
+  if (email !== DEPUTY_EMAIL) throw new ForbiddenError();
+  try {
+    const row = await sql<{ active: boolean | string }>`
+      select active from staff where email = ${email}
+    `;
+    const active = row[0]?.active;
+    const live = active === true || active === "t" || active === "true";
+    if (!row[0] || !live) throw new ForbiddenError();
+  } catch (err) {
+    if (err instanceof ForbiddenError) throw err;
+    throw new ForbiddenError();
+  }
+  return { email, isOwner: false as const };
 }
 
 function slugify(name: string, fallback = "crop") {
@@ -53,10 +71,22 @@ export const ensureAdmin = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     try {
-      await requireAdmin(sql, context.userId);
-      return { ok: true as const, isAdmin: true };
+      const staff = await requireAdmin(sql, context.userId);
+      return {
+        ok: true as const,
+        isAdmin: true,
+        isOwner: staff.isOwner,
+        email: staff.email,
+      };
     } catch (err) {
-      if (err instanceof ForbiddenError) return { ok: false as const, isAdmin: false };
+      if (err instanceof ForbiddenError) {
+        return {
+          ok: false as const,
+          isAdmin: false,
+          isOwner: false,
+          email: null as string | null,
+        };
+      }
       throw err;
     }
   });
@@ -527,3 +557,59 @@ export const deletePartner = createServerFn({ method: "POST" })
     await sql`delete from partners where id = ${id}`;
     return { ok: true as const };
   });
+
+export const listStaff = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<StaffMember[]> => {
+    const sql = await getSql();
+    const me = await requireAdmin(sql, context.userId);
+    if (!me.isOwner) throw new ForbiddenError();
+    const rows = await sql<{ email: string; role: string; active: boolean | string }>`
+      select email, role, active from staff
+    `;
+    const byEmail = new Map(
+      rows.map((row) => [
+        row.email.trim().toLowerCase(),
+        {
+          email: row.email.trim().toLowerCase(),
+          role: row.role === "owner" ? ("owner" as const) : ("admin" as const),
+          active: row.active === true || row.active === "t" || row.active === "true",
+        },
+      ]),
+    );
+    return [
+      byEmail.get(OWNER_EMAIL) ?? {
+        email: OWNER_EMAIL,
+        role: "owner",
+        active: true,
+      },
+      byEmail.get(DEPUTY_EMAIL) ?? {
+        email: DEPUTY_EMAIL,
+        role: "admin",
+        active: false,
+      },
+    ];
+  });
+
+export const setStaffActive = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((raw: unknown) => {
+    const d = (raw ?? {}) as { email?: string; active?: boolean };
+    const email = String(d.email ?? "").trim().toLowerCase();
+    if (email !== DEPUTY_EMAIL) {
+      throw new Error("Only the second desk can be removed.");
+    }
+    return { email, active: d.active !== false };
+  })
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const me = await requireAdmin(sql, context.userId);
+    if (!me.isOwner) throw new ForbiddenError();
+    await sql`
+      insert into staff (email, role, active)
+      values (${data.email}, 'admin', ${data.active})
+      on conflict (email) do update set active = excluded.active
+    `;
+    return { ok: true as const };
+  });
+
