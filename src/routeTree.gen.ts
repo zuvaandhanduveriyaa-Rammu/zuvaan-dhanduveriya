@@ -15,6 +15,7 @@ import { Route as FarmRouteImport } from './routes/farm'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrderRouteImport } from './routes/order'
 import { Route as ProduceRouteImport } from './routes/produce'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as StoryRouteImport } from './routes/story'
 import { Route as VisitRouteImport } from './routes/visit'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -49,6 +50,11 @@ const ProduceRoute = ProduceRouteImport.update({
   path: '/produce',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StoryRoute = StoryRouteImport.update({
   id: '/story',
   path: '/story',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/produce': typeof ProduceRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/story': typeof StoryRoute
   '/visit': typeof VisitRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/produce': typeof ProduceRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/story': typeof StoryRoute
   '/visit': typeof VisitRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/order': typeof OrderRoute
   '/produce': typeof ProduceRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/story': typeof StoryRoute
   '/visit': typeof VisitRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/produce'
+    | '/reset-password'
     | '/story'
     | '/visit'
     | '/api/auth/$'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/produce'
+    | '/reset-password'
     | '/story'
     | '/visit'
     | '/api/auth/$'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/order'
     | '/produce'
+    | '/reset-password'
     | '/story'
     | '/visit'
     | '/api/auth/$'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrderRoute: typeof OrderRoute
   ProduceRoute: typeof ProduceRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   StoryRoute: typeof StoryRoute
   VisitRoute: typeof VisitRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProduceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/story': {
       id: '/story'
       path: '/story'
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrderRoute: OrderRoute,
   ProduceRoute: ProduceRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   StoryRoute: StoryRoute,
   VisitRoute: VisitRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

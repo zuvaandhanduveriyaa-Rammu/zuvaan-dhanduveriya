@@ -50,6 +50,20 @@ export function grokOAuthAvailable(): boolean {
   return window.location.hostname.endsWith(".grok-sandbox.com");
 }
 
+export async function requestPasswordReset(email: string) {
+  return authClient.$fetch("/request-password-reset", {
+    method: "POST",
+    body: { email, redirectTo: "/reset-password" },
+  });
+}
+
+export async function submitNewPassword(newPassword: string, token: string) {
+  return authClient.$fetch("/reset-password", {
+    method: "POST",
+    body: { newPassword, token },
+  });
+}
+
 // ── Live-preview bearer token ────────────────────────────────────────────────
 // The embedded preview iframe has partitioned cookies, so we keep the session's
 // bearer token in sessionStorage and attach it to every Better Auth request (and

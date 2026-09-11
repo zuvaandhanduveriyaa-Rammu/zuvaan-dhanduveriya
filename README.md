@@ -95,12 +95,14 @@ Paste these as **secrets**. Do not commit them. There is no `DATABASE_URL`.
 | Name | What to paste |
 |---|---|
 | `BETTER_AUTH_SECRET` | A long random string (e.g. `openssl rand -hex 32`) |
+| `RESEND_API_KEY` | Optional. Needed so **Forgot password** can email a reset link. |
+| `RESET_FROM_EMAIL` | Optional. Verified sender such as `Zuvaan Dhanduveriya <noreply@zuvaandhanduveriya.com>`. |
 | `GROK_AUTH_CLIENT_ID` | Grok auth broker client id (Google/X federation). Optional if you only use email login. |
 | `GROK_AUTH_CLIENT_SECRET` | Grok auth broker client secret. Optional if you only use email login. |
 
 `BETTER_AUTH_URL` is already set in `wrangler.jsonc` to `https://zuvaandhanduveriya.com`. Change it there if the live host is different (for example the first `*.workers.dev` URL).
 
-Google and X in this app go through the Grok auth broker (`GROK_AUTH_*`), not native Google/X client ids. On the live farm domain, Superadmin is **email and password** (Google on this host is rejected as "Invalid redirect URI"). First visit: create the staff login with the farm Gmail, then sign in. Email/password needs D1 + `BETTER_AUTH_SECRET`.
+Google and X in this app go through the Grok auth broker (`GROK_AUTH_*`), not native Google/X client ids. On the live farm domain, Superadmin is **email and password** (Google on this host is rejected as "Invalid redirect URI"). First visit: **Need a staff login?** with the farm Gmail, then sign in. Later, **Forgot password?** emails a reset link. That needs a `RESEND_API_KEY` Worker secret (Resend). Without it, the desk says reset email is not connected yet. Email/password also needs D1 + `BETTER_AUTH_SECRET`.
 
 You can delete any leftover `DATABASE_URL` Worker secret. It is unused.
 

@@ -11,7 +11,8 @@
  *
  * NEVER import this from client code. The client uses `@/lib/auth/client`.
  */
-import { betterAuth } from "better-auth";
+import { betterAuth, APIError } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
@@ -21,6 +22,10 @@ import { env, isCloudflareWorker } from "../env.server.ts";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
+import {
+  resetEmailConfigured,
+  sendPasswordResetEmail,
+} from "../mail/send-reset";
 import {
   GROK_ISSUER_DEFAULT,
   PREVIEW_ALLOWED_HOSTS,
@@ -143,7 +148,33 @@ export const auth = betterAuth({
 
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          minPasswordLength: 8,
+          sendResetPassword: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
+            await sendPasswordResetEmail({
+              to: user.email,
+              name: user.name,
+              url,
+            });
+          },
+        },
+      }
+    : {}),
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/request-password-reset") return;
+      if (!resetEmailConfigured()) {
+        throw new APIError("BAD_REQUEST", {
+          message:
+            "Reset email is not connected yet. If this is your first visit, create a staff login instead.",
+        });
+      }
+    }),
+  },
 
   advanced: {
     useSecureCookies: false,

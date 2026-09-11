@@ -21,6 +21,8 @@ declare module "cloudflare:workers" {
     GROK_AUTH_ISSUER?: string;
     VITE_AUTH_ENABLED?: string;
     GROK_PROJECT_ID?: string;
+    RESEND_API_KEY?: string;
+    RESET_FROM_EMAIL?: string;
     [key: string]: string | D1Database | undefined;
   };
 }
