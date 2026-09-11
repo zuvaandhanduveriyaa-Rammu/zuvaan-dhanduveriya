@@ -40,6 +40,16 @@ export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
 
+/**
+ * Google/X go through Grok's shared preview OAuth client, which only allows
+ * `*.grok-sandbox.com` as a redirect. The live farm domain is rejected with
+ * "Invalid redirect URI". Only show those buttons in the Grok preview.
+ */
+export function grokOAuthAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.endsWith(".grok-sandbox.com");
+}
+
 // ── Live-preview bearer token ────────────────────────────────────────────────
 // The embedded preview iframe has partitioned cookies, so we keep the session's
 // bearer token in sessionStorage and attach it to every Better Auth request (and

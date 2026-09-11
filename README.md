@@ -100,7 +100,7 @@ Paste these as **secrets**. Do not commit them. There is no `DATABASE_URL`.
 
 `BETTER_AUTH_URL` is already set in `wrangler.jsonc` to `https://zuvaandhanduveriya.com`. Change it there if the live host is different (for example the first `*.workers.dev` URL).
 
-Google and X in this app go through the Grok auth broker (`GROK_AUTH_*`), not native Google/X client ids. Email/password Superadmin works with D1 + `BETTER_AUTH_SECRET`.
+Google and X in this app go through the Grok auth broker (`GROK_AUTH_*`), not native Google/X client ids. On the live farm domain, Superadmin is **email and password** (Google on this host is rejected as "Invalid redirect URI"). First visit: create the staff login with the farm Gmail, then sign in. Email/password needs D1 + `BETTER_AUTH_SECRET`.
 
 You can delete any leftover `DATABASE_URL` Worker secret. It is unused.
 

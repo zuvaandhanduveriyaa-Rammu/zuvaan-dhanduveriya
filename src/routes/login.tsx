@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { SiteImage } from "@/components/site-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import {
   authClient,
   authEnabled,
+  grokOAuthAvailable,
   GROK_PROVIDERS,
   signIn,
 } from "@/lib/auth/client";
@@ -31,6 +32,11 @@ function LoginForm() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showOAuth, setShowOAuth] = useState(false);
+
+  useEffect(() => {
+    setShowOAuth(grokOAuthAvailable());
+  }, []);
 
   async function onEmail(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -85,10 +91,11 @@ function LoginForm() {
             <em className="font-serif font-normal italic">for the farm</em>
           </h1>
           <p className="mt-3 text-sm text-muted">
-            Sign in with a farm Gmail. Any other account will see no access.
+            Use a farm Gmail and a password. First visit, create the staff
+            login. Any other email sees no access.
           </p>
 
-          {authEnabled ? (
+          {authEnabled && showOAuth ? (
             <div className="mt-6 grid gap-2">
               {GROK_PROVIDERS.map((p) => (
                 <button
@@ -101,17 +108,24 @@ function LoginForm() {
                 </button>
               ))}
             </div>
-          ) : (
+          ) : null}
+
+          {authEnabled && showOAuth ? (
+            <div className="mt-6 flex items-center gap-3 text-[0.7rem] tracking-wider text-subtle uppercase">
+              <span className="h-px flex-1 bg-border" />
+              or email
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          ) : null}
+
+          {!authEnabled ? (
             <p className="mt-6 text-sm text-muted">Sign-in is disabled.</p>
-          )}
+          ) : null}
 
-          <div className="mt-6 flex items-center gap-3 text-[0.7rem] tracking-wider text-subtle uppercase">
-            <span className="h-px flex-1 bg-border" />
-            or email
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <form onSubmit={onEmail} className="mt-5 grid gap-3">
+          <form
+            onSubmit={onEmail}
+            className={showOAuth ? "mt-5 grid gap-3" : "mt-6 grid gap-3"}
+          >
             {mode === "up" ? (
               <label className="grid gap-2 text-xs text-muted">
                 Name

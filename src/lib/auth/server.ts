@@ -84,20 +84,29 @@ const grokAuthorizationUrl = `${issuerBase}/api/auth/oauth2/authorize`;
 const grokTokenUrl = `${issuerBase}/api/auth/oauth2/token`;
 const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 
-const grokOAuthPlugin = authConfigured
-  ? genericOAuth({
-      config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
-        providerId,
-        clientId: grokClientId as string,
-        clientSecret: grokClientSecret as string,
-        authorizationUrl: grokAuthorizationUrl,
-        tokenUrl: grokTokenUrl,
-        userInfoUrl: grokUserInfoUrl,
-        scopes: ["openid", "profile", "email"],
-        authorizationUrlParams: { idp, prompt: "login" },
-      })),
-    })
-  : null;
+// `grok_preview` only allows redirect URIs on `*.grok-sandbox.com`. Using it
+// against zuvaandhanduveriya.com returns "Invalid redirect URI". Keep Google/X
+// off on the live farm unless a real GROK_AUTH_CLIENT_ID is set.
+const previewClientOnProduction =
+  grokClientId === PREVIEW_CLIENT_ID &&
+  Boolean(explicitBaseURL) &&
+  !/grok-sandbox\.com/i.test(explicitBaseURL ?? "");
+
+const grokOAuthPlugin =
+  authConfigured && !previewClientOnProduction
+    ? genericOAuth({
+        config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
+          providerId,
+          clientId: grokClientId as string,
+          clientSecret: grokClientSecret as string,
+          authorizationUrl: grokAuthorizationUrl,
+          tokenUrl: grokTokenUrl,
+          userInfoUrl: grokUserInfoUrl,
+          scopes: ["openid", "profile", "email"],
+          authorizationUrlParams: { idp, prompt: "login" },
+        })),
+      })
+    : null;
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
