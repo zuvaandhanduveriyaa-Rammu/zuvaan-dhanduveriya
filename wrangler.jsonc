@@ -15,7 +15,7 @@
       "binding": "DB",
       "database_name": "zuvaan",
       // Paste the database_id printed by `npx wrangler d1 create zuvaan`
-      "database_id": "00000000-0000-4000-8000-000000000000",
+      "database_id": 53f545bc-72ab-494b-970f-a1418a310395,
       "migrations_dir": "migrations"
     }
   ]
