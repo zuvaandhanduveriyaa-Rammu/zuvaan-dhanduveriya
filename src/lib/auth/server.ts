@@ -36,7 +36,7 @@ import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { neonConfig, Pool } from "@neondatabase/serverless";
 import { ensureDbReady, getPglite } from "../db";
-import { env } from "../env.server.ts";
+import { env, isCloudflareWorker } from "../env.server.ts";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
@@ -48,8 +48,9 @@ import {
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
 
-// Kick (and share) PGLite bootstrap as soon as the auth server module loads.
-void ensureDbReady();
+// Kick PGLite bootstrap in Node preview only. Workers stub PGLite; doing this
+// on the isolate used to reject unhandled and 500 the whole site.
+if (!isCloudflareWorker()) void ensureDbReady();
 
 /**
  * Preview secret must outlive module reloads: PGLite (and its session rows) is

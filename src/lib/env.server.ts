@@ -1,10 +1,18 @@
 import { env as workerEnv } from "cloudflare:workers";
 
 export function env(key: string): string | undefined {
-  const fromWorker = workerEnv?.[key];
+  const fromWorker = (workerEnv as Record<string, unknown> | undefined)?.[key];
   if (typeof fromWorker === "string" && fromWorker.trim()) return fromWorker.trim();
   const v = typeof process !== "undefined" ? process.env[key]?.trim() : undefined;
   return v || undefined;
+}
+
+/** True inside a Cloudflare Worker isolate (not Node `vite dev`). */
+export function isCloudflareWorker(): boolean {
+  return (
+    (typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers") ||
+    typeof (globalThis as { WorkerGlobalScope?: unknown }).WorkerGlobalScope !== "undefined"
+  );
 }
 
 /**

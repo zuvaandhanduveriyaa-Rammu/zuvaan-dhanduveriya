@@ -33,27 +33,42 @@ function requestHost(event: GrokPwaEvent): string {
 }
 
 function injectHeadStreaming(response: Response, host: string): Response {
-  const injector = createHeadInjector({
-    host,
-    site: grokOgIdentity.site,
-  });
-  const transformed = response.body!.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        for (const out of injector.push(chunk)) controller.enqueue(out);
-      },
-      flush(controller) {
-        for (const out of injector.flush()) controller.enqueue(out);
-      },
-    }),
-  );
-  const headers = new Headers(response.headers);
-  headers.delete("content-length");
-  return new Response(transformed, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  try {
+    const injector = createHeadInjector({
+      host,
+      site: grokOgIdentity.site,
+    });
+    if (!response.body) return response;
+    const transformed = response.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          try {
+            for (const out of injector.push(chunk)) controller.enqueue(out);
+          } catch (err) {
+            console.error("[grok-pwa] inject chunk failed", err);
+            controller.enqueue(chunk);
+          }
+        },
+        flush(controller) {
+          try {
+            for (const out of injector.flush()) controller.enqueue(out);
+          } catch (err) {
+            console.error("[grok-pwa] inject flush failed", err);
+          }
+        },
+      }),
+    );
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+    return new Response(transformed, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch (err) {
+    console.error("[grok-pwa] inject skipped", err);
+    return response;
+  }
 }
 
 export default async function grokPwaMiddleware(

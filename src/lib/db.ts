@@ -1,22 +1,24 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-import { env } from "./env.server.ts";
+import { env, isCloudflareWorker } from "./env.server.ts";
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
 
-// An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
-// "unset" — otherwise production would silently run on the PGLite fallback.
-// On Cloudflare Workers, secrets are available via `cloudflare:workers` at
-// module scope (process.env may be empty until a request).
-const databaseUrl = env("DATABASE_URL");
+function readDatabaseUrl(): string | undefined {
+  return env("DATABASE_URL");
+}
 
 /**
  * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
- * sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
- * the app has a working database even with nothing configured — the live preview
- * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
+ * sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM).
+ * Read lazily — Worker secrets may be empty at module init.
  */
-export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+export function getDbSource(): DbSource {
+  return readDatabaseUrl() ? "neon" : "pglite";
+}
+
+/** Snapshot for callers that still import `dbSource`. Prefer `getDbSource()`. */
+export const dbSource: DbSource = getDbSource();
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -85,11 +87,11 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
-function createNeonSql(): Promise<Sql> {
+function createNeonSql(databaseUrl: string): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Neon serverless HTTP driver. `pg` TCP cannot run on Cloudflare Workers.
     const { neon } = await import("@neondatabase/serverless");
-    const client = neon(databaseUrl as string);
+    const client = neon(databaseUrl);
     return toSql(async <T>(text: string, params: unknown[]) => {
       const rows = await client.query(text, params);
       return rows as T[];
@@ -102,6 +104,11 @@ function createNeonSql(): Promise<Sql> {
 }
 
 async function createPgliteSql(): Promise<Sql> {
+  if (isCloudflareWorker()) {
+    throw new Error(
+      "DATABASE_URL is missing. Add the Neon pooled URL as a Worker secret, then redeploy.",
+    );
+  }
   // Embedded Postgres, imported on demand so it never loads on the Neon path.
   // One in-memory instance per process, shared across HMR module instances, so
   // data survives source edits (it resets on dev-server restart).
@@ -172,7 +179,8 @@ async function createSql(): Promise<Sql> {
         "or a server route loader, never from client code.",
     );
   }
-  return dbSource === "neon" ? createNeonSql() : createPgliteSql();
+  const databaseUrl = readDatabaseUrl();
+  return databaseUrl ? createNeonSql(databaseUrl) : createPgliteSql();
 }
 
 /**
@@ -196,7 +204,7 @@ export function getSql(): Promise<Sql> {
  * Kysely dialect). Throws when `DATABASE_URL` is set (that path uses Neon).
  */
 export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite> {
-  if (dbSource !== "pglite") {
+  if (getDbSource() !== "pglite") {
     throw new Error("getPglite() is only available on the PGLite fallback (no DATABASE_URL)");
   }
   await getSql();
@@ -210,25 +218,25 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  *
  * - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
  *   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
- * - **Neon**: no-op (pool is created lazily on first query).
+ * - **Neon / Cloudflare Workers**: no-op (pool is created lazily on first query).
  *
  * Vite `configureServer` awaits this at dev startup; production imports of this
  * module kick it off immediately (see bottom of file).
  */
 export function ensureDbReady(): Promise<void> {
-  if (dbSource !== "pglite") return Promise.resolve();
+  if (readDatabaseUrl() || isCloudflareWorker()) return Promise.resolve();
   return getSql().then(() => undefined);
 }
 
 // Server-only eager start: kick PGLite bootstrap as soon as this module loads in
-// Node. Client bundles never hit this path (`getSql` throws in the browser).
+// Node. Never on Cloudflare Workers (PGLite is stubbed; an unhandled rejection
+// here is the live 500). Client bundles never hit this path.
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };
-if (typeof window === "undefined" && dbSource === "pglite") {
+if (typeof window === "undefined" && !readDatabaseUrl() && !isCloudflareWorker()) {
   globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
     globalBoot.__pgBootstrapPromise__ = undefined;
     console.error("[db] PGLite bootstrap failed:", err);
-    throw err;
   });
 }
